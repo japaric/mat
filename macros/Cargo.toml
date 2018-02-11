@@ -1,0 +1,18 @@
+[package]
+name = "mat-macros"
+version = "0.1.0"
+authors = ["Jorge Aparicio <jorge@japaric.io>"]
+
+[dependencies]
+quote = "0.4.2"
+
+[dependencies.syn]
+version = "0.12.12"
+features = ["full"]
+
+[dependencies.proc-macro2]
+features = ["nightly"]
+version = "0.2.2"
+
+[lib]
+proc-macro = true

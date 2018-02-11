@@ -1,0 +1,10 @@
+[package]
+name = "mat"
+version = "0.1.0"
+authors = ["Jorge Aparicio <jorge@japaric.io>"]
+
+[dependencies]
+typenum = "1.9.0"
+mat-macros = { path = "macros" }
+
+[workspace]
