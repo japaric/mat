@@ -1,7 +1,11 @@
 [package]
-name = "mat-macros"
-version = "0.1.0"
 authors = ["Jorge Aparicio <jorge@japaric.io>"]
+description = "Procedural macros for the `mat` crate"
+documentation = "https://docs.rs/mat-macros"
+license = "MIT OR Apache-2.0"
+name = "mat-macros"
+repository = "https://github.com/japaric/mat"
+version = "0.1.0"
 
 [dependencies]
 quote = "0.4.2"
