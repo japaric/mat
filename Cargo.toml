@@ -1,10 +1,16 @@
 [package]
-name = "mat"
-version = "0.1.0"
 authors = ["Jorge Aparicio <jorge@japaric.io>"]
+categories = ["no-std", "science"]
+description = "Statically sized matrices for `no_std` applications"
+documentation = "https://docs.rs/mat"
+keywords = ["matrix"]
+license = "MIT OR Apache-2.0"
+name = "mat"
+repository = "https://github.com/japaric/mat"
+version = "0.1.0"
 
 [dependencies]
 typenum = "1.9.0"
-mat-macros = { path = "macros" }
+mat-macros = { path = "macros", version = "0.1.0" }
 
 [workspace]
