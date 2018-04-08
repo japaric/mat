@@ -7,8 +7,15 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
 
+## [v0.1.1] - 2018-04-08
+
+### Fixed
+
+- Updated dependencies to fix the build on recent nightlies
+
 ## v0.1.0 - 2018-02-19
 
 Initial release
 
-[Unreleased]: https://github.com/japaric/mat/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/japaric/mat/compare/v0.1.1...HEAD
+[v0.1.1]: https://github.com/japaric/mat/compare/v0.1.0...v0.1.1

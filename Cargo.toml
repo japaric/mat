@@ -7,10 +7,10 @@ keywords = ["matrix"]
 license = "MIT OR Apache-2.0"
 name = "mat"
 repository = "https://github.com/japaric/mat"
-version = "0.1.0"
+version = "0.1.1"
 
 [dependencies]
 typenum = "1.9.0"
-mat-macros = { path = "macros", version = "0.1.0" }
+mat-macros = { path = "macros", version = "0.1.1" }
 
 [workspace]
