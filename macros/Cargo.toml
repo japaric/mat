@@ -8,15 +8,15 @@ repository = "https://github.com/japaric/mat"
 version = "0.1.0"
 
 [dependencies]
-quote = "0.4.2"
+quote = "0.5.1"
 
 [dependencies.syn]
-version = "0.12.12"
+version = "0.13.1"
 features = ["full"]
 
 [dependencies.proc-macro2]
 features = ["nightly"]
-version = "0.2.2"
+version = "0.3.6"
 
 [lib]
 proc-macro = true
