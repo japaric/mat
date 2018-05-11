@@ -1,8 +1,11 @@
 set -euxo pipefail
 
 main() {
-    cargo check
-    cargo test
+    cargo check --target $TARGET
+
+    if [ $TARGET = x86_64-unknown-linux-gnu ]; then
+        cargo test --target $TARGET
+    fi
 }
 
 main

@@ -13,29 +13,31 @@
 //! tree*. `get` can be used to force evaluation of such a tree; see below:
 //!
 //! ```
-//! #![feature(proc_macro)]
+//! #[macro_use]
+//! extern crate mat;
 //!
-//! use mat::mat;
 //! use mat::traits::Matrix;
 //!
-//! // 2 by 3 matrix
-//! let a = mat![
-//!     [1, 2, 3],
-//!     [3, 4, 5],
-//! ];
+//! fn main() {
+//!     // 2 by 3 matrix
+//!     let a = mat!(i32, [
+//!         [1, 2, 3],
+//!         [3, 4, 5],
+//!     ]);
 //!
-//! // 3 by 2 matrix
-//! let b = mat![
-//!     [1, 2],
-//!     [3, 4],
-//!     [5, 6],
-//! ];
+//!     // 3 by 2 matrix
+//!     let b = mat!(i32, [
+//!         [1, 2],
+//!         [3, 4],
+//!         [5, 6],
+//!     ]);
 //!
-//! // build an expression tree
-//! let c = &a * &b;
+//!     // build an expression tree
+//!     let c = &a * &b;
 //!
-//! // partially evaluate the tree
-//! assert_eq!(c.get(0, 0), 22);
+//!     // partially evaluate the tree
+//!     assert_eq!(c.get(0, 0), 22);
+//! }
 //! ```
 //!
 //! This program does *not* allocate and compute a whole new matrix C of size 2x2; it simply
@@ -46,7 +48,7 @@
 //!
 //! The following features are out of scope for this library.
 //!
-//! - Operation that require dynamic memory allocation
+//! - Operations that require dynamic memory allocation
 //! - SIMD acceleration
 //! - n-dimensional arrays
 //!
@@ -63,38 +65,128 @@
 
 #![deny(missing_docs)]
 #![deny(warnings)]
-#![feature(proc_macro)]
-#![feature(unsize)]
 #![no_std]
 
-extern crate mat_macros;
-#[doc(hidden)]
-pub extern crate typenum;
-
-use core::ops;
-use core::marker::{PhantomData, Unsize};
-use core::fmt;
-
-pub use mat_macros::mat;
-use typenum::Unsigned;
+extern crate generic_array;
 
 pub mod traits;
 
+use core::marker::PhantomData;
+use core::{fmt, ops};
+
+pub use generic_array::typenum::consts;
+use generic_array::typenum::consts::U1;
+pub use generic_array::typenum::Quot as __Quot;
+use generic_array::typenum::{Prod, Unsigned};
+use generic_array::{ArrayLength, GenericArray};
+
 use traits::{Matrix, UnsafeGet, Zero};
+
+/// Macro to construct a `Mat`rix
+///
+/// # Example
+///
+/// ```
+/// #[macro_use]
+/// extern crate mat;
+///
+/// fn main() {
+///     let a = mat!(i32, [
+///         [1, 2],
+///         [3, 4],
+///     ]);
+///
+///     assert_eq!(a[0][0], 1);
+///     assert_eq!(a[0][1], 2);
+///     assert_eq!(a[1][0], 3);
+///     assert_eq!(a[1][1], 4);
+/// }
+/// ```
+#[macro_export]
+macro_rules! mat {
+    ($ty:ty, [$([$($e:expr),*],)+]) => ({
+        extern crate core;
+
+        type NROWS = __nrows!($crate::consts::U0; [ $([ $($e),* ],)* ] );
+        type NELEMS = __nelems!($crate::consts::U0; [ $( $($e),* ,)* ]);
+        type NCOLS = $crate::__Quot<NELEMS, NROWS>;
+
+        unsafe {
+            core::mem::transmute::<_, $crate::Mat<$ty, NROWS, NCOLS>>(
+                [ $( $({ let e: $ty = $e; e }),* ),* ]
+            )
+        }
+    })
+}
+
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __nrows {
+    ($i:ty; []) => {
+        $i
+    };
+
+    ($i:ty; [ [$($head:expr),*], $( [$($tail:expr),*] ,)*]) => {
+        __nrows!($crate::__Inc<$i>; [$( [$($tail),*] ,)*])
+    };
+}
+
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __nelems {
+    ($i:ty; []) => {
+        $i
+    };
+    ($i:ty; [$head:expr, $($tail:expr,)*]) => {
+        __nelems!($crate::__Inc<$i>; [ $($tail,)* ])
+    };
+}
+
+#[doc(hidden)]
+pub type __Inc<T> = generic_array::typenum::Sum<T, U1>;
+
+/// Row view into a `Mat`rix
+pub struct Row<T, NCOLS>
+where
+    NCOLS: ArrayLength<T>,
+{
+    buffer: GenericArray<T, NCOLS>,
+}
+
+impl<T, NCOLS> ops::Index<usize> for Row<T, NCOLS>
+where
+    NCOLS: ArrayLength<T>,
+{
+    type Output = T;
+
+    fn index(&self, c: usize) -> &T {
+        assert!(c < NCOLS::to_usize());
+
+        unsafe { self.buffer.get_unchecked(c) }
+    }
+}
+
+impl<T, NCOLS> ops::IndexMut<usize> for Row<T, NCOLS>
+where
+    NCOLS: ArrayLength<T>,
+{
+    fn index_mut(&mut self, c: usize) -> &mut T {
+        assert!(c < NCOLS::to_usize());
+
+        unsafe { self.buffer.get_unchecked_mut(c) }
+    }
+}
 
 /// Statically allocated (row major order) matrix
 #[derive(Clone)]
-pub struct Mat<T, BUFFER, NROWS, NCOLS>
+pub struct Mat<T, NROWS, NCOLS>
 where
-    BUFFER: Unsize<[T]>,
-    NCOLS: Unsigned,
-    NROWS: Unsigned,
-    T: Copy,
+    NROWS: ops::Mul<NCOLS>,
+    Prod<NROWS, NCOLS>: ArrayLength<T>,
 {
-    buffer: BUFFER,
-    ty: PhantomData<[T; 0]>,
-    nrows: PhantomData<NROWS>,
-    ncols: PhantomData<NCOLS>,
+    buffer: GenericArray<T, Prod<NROWS, NCOLS>>,
+    _nrows: PhantomData<NROWS>,
+    _ncols: PhantomData<NCOLS>,
 }
 
 /// The product of two matrices
@@ -117,83 +209,85 @@ pub struct Transpose<M> {
     m: M,
 }
 
-impl<T, BUFFER, NROWS, NCOLS> Mat<T, BUFFER, NROWS, NCOLS>
+impl<T, NROWS, NCOLS> fmt::Debug for Mat<T, NROWS, NCOLS>
 where
-    BUFFER: Unsize<[T]>,
-    NROWS: Unsigned,
+    NROWS: ops::Mul<NCOLS>,
     NCOLS: Unsigned,
-    T: Copy,
-{
-    #[doc(hidden)]
-    pub unsafe fn new(buffer: BUFFER) -> Self {
-        Mat {
-            buffer,
-            ty: PhantomData,
-            nrows: PhantomData,
-            ncols: PhantomData,
-        }
-    }
-}
-
-impl<T, BUFFER, NROWS, NCOLS> fmt::Debug for Mat<T, BUFFER, NROWS, NCOLS>
-where
-    BUFFER: Unsize<[T]>,
-    NROWS: Unsigned,
-    NCOLS: Unsigned,
-    T: Copy + fmt::Debug,
+    Prod<NROWS, NCOLS>: ArrayLength<T>,
+    T: fmt::Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let mut is_first = true;
-        let slice: &[T] = &self.buffer;
-        f.write_str("[")?;
-        for row in slice.chunks(NCOLS::to_usize()) {
-            if is_first {
-                is_first = false;
-            } else {
-                f.write_str(", ")?;
-            }
-
-            write!(f, "{:?}", row)?;
-        }
-        f.write_str("]")
+        f.debug_list()
+            .entries(self.buffer.chunks(NCOLS::to_usize()))
+            .finish()
     }
 }
 
-impl<'a, T, BUFFER, NROWS, NCOLS> Matrix for &'a Mat<T, BUFFER, NROWS, NCOLS>
+impl<'a, T, NROWS, NCOLS> Matrix for &'a Mat<T, NROWS, NCOLS>
 where
-    BUFFER: Unsize<[T]>,
-    NROWS: Unsigned,
+    NROWS: ops::Mul<NCOLS> + Unsigned,
     NCOLS: Unsigned,
+    Prod<NROWS, NCOLS>: ArrayLength<T>,
     T: Copy,
 {
     type NROWS = NROWS;
     type NCOLS = NCOLS;
 }
 
-impl<'a, T, BUFFER, NROWS, NCOLS> UnsafeGet for &'a Mat<T, BUFFER, NROWS, NCOLS>
+impl<'a, T, NROWS, NCOLS> UnsafeGet for &'a Mat<T, NROWS, NCOLS>
 where
-    BUFFER: Unsize<[T]>,
-    NROWS: Unsigned,
+    NROWS: ops::Mul<NCOLS> + Unsigned,
     NCOLS: Unsigned,
+    Prod<NROWS, NCOLS>: ArrayLength<T>,
     T: Copy,
 {
     type Elem = T;
 
     unsafe fn unsafe_get(self, r: usize, c: usize) -> T {
-        let slice: &[T] = &self.buffer;
-        *slice.get_unchecked(r * NCOLS::to_usize() + c)
+        *self.buffer.get_unchecked(r * NCOLS::to_usize() + c)
     }
 }
 
-impl<'a, T, BUFFER, NROWS, NCOLS, R> ops::Mul<R> for &'a Mat<T, BUFFER, NROWS, NCOLS>
+impl<T, NROWS, NCOLS> ops::Index<usize> for Mat<T, NROWS, NCOLS>
 where
-    BUFFER: Unsize<[T]>,
-    NROWS: Unsigned,
+    NROWS: ops::Mul<NCOLS> + Unsigned,
+    NCOLS: ArrayLength<T> + Unsigned,
+    Prod<NROWS, NCOLS>: ArrayLength<T>,
+{
+    type Output = Row<T, NCOLS>;
+
+    fn index(&self, r: usize) -> &Row<T, NCOLS> {
+        assert!(r < NROWS::to_usize());
+
+        unsafe {
+            &*(self.buffer.get_unchecked(r * NCOLS::to_usize()) as *const _ as *const Row<_, _>)
+        }
+    }
+}
+
+impl<T, NROWS, NCOLS> ops::IndexMut<usize> for Mat<T, NROWS, NCOLS>
+where
+    NROWS: ops::Mul<NCOLS> + Unsigned,
+    NCOLS: ArrayLength<T> + Unsigned,
+    Prod<NROWS, NCOLS>: ArrayLength<T>,
+{
+    fn index_mut(&mut self, r: usize) -> &mut Row<T, NCOLS> {
+        assert!(r < NROWS::to_usize());
+
+        unsafe {
+            &mut *(self.buffer.get_unchecked_mut(r * NCOLS::to_usize()) as *mut _ as *mut Row<_, _>)
+        }
+    }
+}
+
+impl<'a, T, NROWS, NCOLS, R> ops::Mul<R> for &'a Mat<T, NROWS, NCOLS>
+where
+    NROWS: ops::Mul<NCOLS>,
     NCOLS: Unsigned,
-    T: Copy,
+    Prod<NROWS, NCOLS>: ArrayLength<T>,
     R: Matrix<NROWS = NCOLS>,
 {
-    type Output = Product<&'a Mat<T, BUFFER, NROWS, NCOLS>, R>;
+    type Output = Product<&'a Mat<T, NROWS, NCOLS>, R>;
 
     fn mul(self, rhs: R) -> Self::Output {
         Product { l: self, r: rhs }

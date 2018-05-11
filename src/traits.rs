@@ -1,6 +1,6 @@
 //! Traits
 
-use typenum::Unsigned;
+use generic_array::typenum::Unsigned;
 
 /// The transpose operation
 pub trait Transpose: Copy {
